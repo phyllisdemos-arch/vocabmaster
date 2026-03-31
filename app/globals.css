@@ -1,0 +1,143 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-800;
+  }
+}
+
+@layer components {
+  /* Claymorphism Button */
+  .clay-btn {
+    @apply relative px-6 py-3 rounded-2xl font-semibold text-white
+      transition-all duration-300 ease-out
+      active:scale-95 active:translate-y-0;
+    background: linear-gradient(135deg, #2563EB, #3B82F6);
+    box-shadow:
+      8px 8px 16px rgba(37, 99, 235, 0.3),
+      -8px -8px 16px rgba(255, 255, 255, 0.8),
+      inset 4px 4px 8px rgba(255, 255, 255, 0.4);
+  }
+
+  .clay-btn:hover {
+    @apply -translate-y-1;
+    box-shadow:
+      12px 12px 20px rgba(37, 99, 235, 0.4),
+      -12px -12px 20px rgba(255, 255, 255, 0.9);
+  }
+
+  .clay-btn-orange {
+    background: linear-gradient(135deg, #F97316, #FB923C);
+    box-shadow:
+      8px 8px 16px rgba(249, 115, 22, 0.3),
+      -8px -8px 16px rgba(255, 255, 255, 0.8),
+      inset 4px 4px 8px rgba(255, 255, 255, 0.4);
+  }
+
+  .clay-btn-orange:hover {
+    box-shadow:
+      12px 12px 20px rgba(249, 115, 22, 0.4),
+      -12px -12px 20px rgba(255, 255, 255, 0.9);
+  }
+
+  .clay-btn-green {
+    background: linear-gradient(135deg, #10B981, #34D399);
+    box-shadow:
+      8px 8px 16px rgba(16, 185, 129, 0.3),
+      -8px -8px 16px rgba(255, 255, 255, 0.8),
+      inset 4px 4px 8px rgba(255, 255, 255, 0.4);
+  }
+
+  .clay-btn-green:hover {
+    box-shadow:
+      12px 12px 20px rgba(16, 185, 129, 0.4),
+      -12px -12px 20px rgba(255, 255, 255, 0.9);
+  }
+
+  /* Claymorphism Card */
+  .clay-card {
+    @apply bg-white rounded-3xl p-6 transition-all duration-300 ease-out;
+    box-shadow:
+      12px 12px 24px rgba(37, 99, 235, 0.15),
+      -12px -12px 24px rgba(255, 255, 255, 0.9),
+      inset 2px 2px 4px rgba(255, 255, 255, 0.8);
+  }
+
+  .clay-card:hover {
+    @apply -translate-y-1;
+    box-shadow:
+      16px 16px 32px rgba(37, 99, 235, 0.2),
+      -16px -16px 32px rgba(255, 255, 255, 0.95);
+  }
+
+  /* Claymorphism Input */
+  .clay-input {
+    @apply w-full px-4 py-3 rounded-2xl bg-white border-2 border-transparent
+      focus:border-primary-light focus:outline-none transition-all;
+    box-shadow:
+      inset 4px 4px 8px rgba(37, 99, 235, 0.1),
+      inset -4px -4px 8px rgba(255, 255, 255, 0.9);
+  }
+
+  /* Progress Bar */
+  .progress-bar {
+    @apply h-3 bg-white rounded-full overflow-hidden;
+    box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .progress-fill {
+    @apply h-full rounded-full transition-all duration-500 ease-out;
+    background: linear-gradient(90deg, #2563EB, #3B82F6, #10B981);
+  }
+}
+
+/* Flashcard Flip Animation */
+.flashcard-container {
+  perspective: 1000px;
+}
+
+.flashcard {
+  transition: transform 0.6s;
+  transform-style: preserve-3d;
+}
+
+.flashcard.flipped {
+  transform: rotateY(180deg);
+}
+
+.flashcard-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.flashcard-back {
+  transform: rotateY(180deg);
+}
+
+/* New flip animation classes to prevent jitter */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.transform-style-3d {
+  transform-style: preserve-3d;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.transition-transform {
+  transition-property: transform;
+}
+
+.duration-700 {
+  transition-duration: 700ms;
+}
