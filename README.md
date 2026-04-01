@@ -43,6 +43,54 @@ npm run build
 npm start
 ```
 
+## 🧪 测试
+
+项目已配置完整的测试框架，包括 17 个测试用例。
+
+### 安装测试依赖
+
+**Windows (PowerShell):**
+```powershell
+.\install-testing-deps.ps1
+```
+
+**Linux/Mac:**
+```bash
+./install-testing-deps.sh
+```
+
+**或手动安装:**
+```bash
+npm install --save-dev vitest @vitest/ui @vitejs/plugin-react jsdom @testing-library/react @testing-library/jest-dom @testing-library/user-event
+```
+
+### 运行测试
+
+```bash
+# 运行所有测试
+npm test
+
+# 监视模式
+npm run test:watch
+
+# 生成覆盖率报告
+npm run test:coverage
+
+# UI 界面
+npm run test:ui
+```
+
+### 测试覆盖
+
+- ✅ **ClayButton** - 8 个测试用例
+- ✅ **Navigation** - 4 个测试用例
+- ✅ **Home Page** - 5 个测试用例
+
+详细文档请查看：
+- `TESTING.md` - 完整测试指南
+- `QUICKSTART_TEST.md` - 快速开始
+- `TEST_INSTALLATION_GUIDE.md` - 安装指南
+
 ## 📁 项目结构
 
 ```

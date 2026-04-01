@@ -5,6 +5,9 @@
 
 # testing
 /coverage
+vitest-report
+.nyc_output
+*.lcov
 
 # next.js
 /.next/
