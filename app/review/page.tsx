@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Flashcard from "@/components/Flashcard";
-import { Clock } from "lucide-react";
+import ProgressBar from "@/components/ProgressBar";
+import { RotateCcw, Home } from "lucide-react";
 
 interface ReviewWord {
   id: number;
@@ -12,6 +14,7 @@ interface ReviewWord {
   partOfSpeech: string;
   example: string;
   dueAt: string;
+  isFavorite?: boolean;
 }
 
 const reviewWords: ReviewWord[] = [
@@ -47,28 +50,152 @@ const reviewWords: ReviewWord[] = [
 const SM2_INTERVALS = [1, 10, 30, 60, 120, 240]; // minutes
 
 export default function ReviewPage() {
+  const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [showRating, setShowRating] = useState(false);
-  const [completed, setCompleted] = useState<number[]>([]);
+  const [words, setWords] = useState<ReviewWord[]>(reviewWords);
+  const [known, setKnown] = useState<number[]>([]);
+  const [unknown, setUnknown] = useState<number[]>([]);
+  const [startTime, setStartTime] = useState<number>(Date.now());
 
-  const currentWord = reviewWords[currentIndex];
-  const isCompleted = currentIndex >= reviewWords.length;
+  const currentWord = words[currentIndex];
+  const isLastCard = currentIndex === words.length - 1;
+  const isCompleted = currentIndex >= words.length;
 
-  const handleFlip = () => {
-    setShowRating(true);
+  // Save study session on unmount
+  useEffect(() => {
+    return () => {
+      saveStudySession();
+    };
+  }, [known, unknown, currentIndex]);
+
+  const saveStudySession = () => {
+    if (typeof window === 'undefined' || known.length + unknown.length === 0) return;
+
+    try {
+      const historyJson = localStorage.getItem('vocabmaster-study-history');
+      const history = historyJson ? JSON.parse(historyJson) : [];
+
+      const duration = Math.round((Date.now() - startTime) / 1000 / 60); // in minutes
+      const today = new Date().toISOString().split('T')[0];
+
+      const session = {
+        date: today,
+        wordsLearned: known.length,
+        wordsReviewed: unknown.length,
+        duration: duration,
+      };
+
+      history.push(session);
+      localStorage.setItem('vocabmaster-study-history', JSON.stringify(history));
+    } catch (error) {
+      console.error('Failed to save study session:', error);
+    }
   };
 
-  const handleRate = (rating: number) => {
-    // Simplified SM-2 algorithm
-    // rating: 1=forget, 2=hard, 3=good, 4=easy
-    setCompleted([...completed, currentWord.id]);
-    setShowRating(false);
-
-    setTimeout(() => {
-      if (currentIndex < reviewWords.length - 1) {
-        setCurrentIndex(currentIndex + 1);
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input
+      if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') {
+        return;
       }
-    }, 300);
+
+      switch(e.key) {
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+          e.preventDefault();
+          handlePrevious();
+          break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+          // Don't allow next if on last card
+          if (currentIndex !== words.length - 1) {
+            e.preventDefault();
+            handleNext(true);
+          }
+          break;
+        case 's':
+        case 'S':
+          e.preventDefault();
+          speak();
+          break;
+        case 'f':
+        case 'F':
+          e.preventDefault();
+          handleToggleFavorite(words[currentIndex]?.id);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentIndex, words]);
+
+  const speak = () => {
+    if (currentWord) {
+      const utterance = new SpeechSynthesisUtterance(currentWord.word);
+      utterance.lang = "en-US";
+      speechSynthesis.speak(utterance);
+    }
+  };
+
+  const handleNext = (isKnown: boolean) => {
+    if (isKnown) {
+      setKnown([...known, currentWord.id]);
+    } else {
+      setUnknown([...unknown, currentWord.id]);
+    }
+
+    if (isLastCard) {
+      // Navigate to results
+      router.push("/review/results");
+    } else {
+      setCurrentIndex(currentIndex + 1);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+    }
+  };
+
+  const handleReset = () => {
+    setCurrentIndex(0);
+    setKnown([]);
+    setUnknown([]);
+  };
+
+  const handleToggleFavorite = async (wordId: number) => {
+    if (!wordId) return;
+
+    const word = words.find((w: ReviewWord) => w.id === wordId);
+    if (!word) return;
+
+    const newFavoriteStatus = !word.isFavorite;
+
+    try {
+      if (newFavoriteStatus) {
+        // Add to favorites via API
+        await fetch('/api/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(word)
+        });
+      } else {
+        // Remove from favorites via API
+        await fetch(`/api/favorites?id=${wordId}`, { method: 'DELETE' });
+      }
+
+      // Update local state
+      setWords(words.map((w: ReviewWord) =>
+        w.id === wordId ? { ...w, isFavorite: newFavoriteStatus } : w
+      ));
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+    }
   };
 
   if (isCompleted) {
@@ -80,8 +207,18 @@ export default function ReviewPage() {
             复习完成！
           </h2>
           <p className="text-gray-600 mb-6">
-            今天已完成 {completed.length} 个单词的复习
+            今天已完成 {known.length + unknown.length} 个单词的复习
           </p>
+          <div className="flex justify-center gap-8 mb-6">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">{known.length}</div>
+              <div className="text-sm text-gray-500">已认识</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-orange-600">{unknown.length}</div>
+              <div className="text-sm text-gray-500">需复习</div>
+            </div>
+          </div>
           <button className="clay-btn" onClick={() => window.location.reload()}>
             继续学习
           </button>
@@ -93,108 +230,55 @@ export default function ReviewPage() {
   return (
     <div className="max-w-2xl mx-auto">
       {/* Header */}
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-100 text-primary mb-4">
-          <Clock size={18} />
-          <span className="font-medium">今日待复习: {reviewWords.length - currentIndex} 个</span>
-        </div>
+      <div className="flex items-center justify-between mb-6">
+        <button
+          onClick={() => router.push("/")}
+          className="flex items-center gap-2 text-gray-600 hover:text-primary transition-colors"
+        >
+          <Home size={20} />
+          返回首页
+        </button>
+        <button
+          onClick={handleReset}
+          className="flex items-center gap-2 text-gray-600 hover:text-primary transition-colors"
+        >
+          <RotateCcw size={20} />
+          重新开始
+        </button>
       </div>
 
       {/* Progress */}
       <div className="mb-8">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-sm font-medium text-gray-600">复习进度</span>
-          <span className="text-sm font-bold text-primary">
-            {currentIndex}/{reviewWords.length}
-          </span>
-        </div>
-        <div className="progress-bar">
-          <div className="progress-fill" style={{ width: `${(currentIndex / reviewWords.length) * 100}%` }} />
-        </div>
+        <ProgressBar current={currentIndex + 1} total={words.length} />
       </div>
 
       {/* Flashcard */}
       <div className="mb-8">
-        <div className="flashcard-container">
-          <div
-            className={`flashcard relative w-full h-96 ${showRating ? "flipped" : ""}`}
-            onClick={handleFlip}
-          >
-            {/* Front */}
-            <div className="flashcard-face absolute inset-0 clay-card flex flex-col items-center justify-center p-8">
-              <div className="text-6xl mb-4">🔄</div>
-              <h2 className="text-4xl font-bold font-display text-primary mb-2">
-                {currentWord.word}
-              </h2>
-              <p className="text-xl text-gray-500 mb-6">{currentWord.pronunciation}</p>
-              <p className="text-gray-400 text-sm">点击卡片查看答案</p>
-            </div>
-
-            {/* Back */}
-            <div className="flashcard-face flashcard-back absolute inset-0 clay-card flex flex-col items-center justify-center p-8">
-              <div className="w-full">
-                <div className="text-center mb-6">
-                  <span className="inline-block px-3 py-1 rounded-full bg-blue-100 text-primary text-sm font-medium mb-2">
-                    {currentWord.partOfSpeech}
-                  </span>
-                  <p className="text-2xl font-semibold text-gray-800">
-                    {currentWord.definition}
-                  </p>
-                </div>
-
-                <div className="bg-blue-50 rounded-2xl p-4 mb-6">
-                  <p className="text-sm text-gray-500 mb-1">例句</p>
-                  <p className="text-gray-700 italic">&quot;{currentWord.example}&quot;</p>
-                </div>
-
-                {/* Rating Buttons */}
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRate(1);
-                    }}
-                    className="py-3 px-4 rounded-xl bg-red-100 hover:bg-red-200 transition-colors text-red-700 font-medium"
-                  >
-                    😞 完全忘记
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRate(2);
-                    }}
-                    className="py-3 px-4 rounded-xl bg-orange-100 hover:bg-orange-200 transition-colors text-orange-700 font-medium"
-                  >
-                    🤔 有点印象
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRate(3);
-                    }}
-                    className="py-3 px-4 rounded-xl bg-green-100 hover:bg-green-200 transition-colors text-green-700 font-medium"
-                  >
-                    😊 记住了
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRate(4);
-                    }}
-                    className="py-3 px-4 rounded-xl bg-blue-100 hover:bg-blue-200 transition-colors text-blue-700 font-medium"
-                  >
-                    🎯 轻松掌握
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <Flashcard
+          word={currentWord}
+          currentIndex={currentIndex}
+          totalWords={words.length}
+          isLastWord={isLastCard}
+          onNext={handleNext}
+          onPrevious={handlePrevious}
+          onToggleFavorite={handleToggleFavorite}
+        />
       </div>
 
-      {/* Instructions */}
-      <div className="text-center text-sm text-gray-500">
-        <p>根据记忆程度选择评分，系统会自动安排下次复习时间</p>
+      {/* Stats */}
+      <div className="flex justify-center gap-8">
+        <div className="text-center">
+          <div className="text-2xl font-bold text-green-600">{known.length}</div>
+          <div className="text-sm text-gray-500">已认识</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-orange-600">{unknown.length}</div>
+          <div className="text-sm text-gray-500">需复习</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-primary">{words.length - currentIndex}</div>
+          <div className="text-sm text-gray-500">剩余</div>
+        </div>
       </div>
     </div>
   );

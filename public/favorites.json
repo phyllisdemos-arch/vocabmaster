@@ -1,0 +1,147 @@
+[
+  {
+    "word": "American",
+    "pronunciation": "/əˈmerɪkən/",
+    "definition": "美国的；美国人",
+    "partOfSpeech": "adj. / n.",
+    "example": "While American culture has a global influence, it is important to appreciate the diversity within the United States itself.",
+    "isLearned": false,
+    "isFavorite": true,
+    "id": "1-0"
+  },
+  {
+    "word": "British",
+    "pronunciation": "/ˈbrɪtɪʃ/",
+    "definition": "英国的；英国人的",
+    "partOfSpeech": "adj. / n.",
+    "example": "Many students find it challenging to distinguish between various British accents, which vary significantly from region to region.",
+    "isLearned": false,
+    "isFavorite": true,
+    "id": "1-1"
+  },
+  {
+    "word": "Mexico",
+    "pronunciation": "/ˈmeksɪkoʊ/",
+    "definition": "墨西哥",
+    "partOfSpeech": "n.",
+    "example": "Every year, millions of tourists visit Mexico to explore its breathtaking beaches and well-preserved Mayan archaeological sites.",
+    "isLearned": false,
+    "isFavorite": true,
+    "id": "1-10"
+  },
+  {
+    "word": "China",
+    "pronunciation": "/ˈtʃaɪnə/",
+    "definition": "中国",
+    "partOfSpeech": "n.",
+    "example": "As a country with a long history, China is playing an increasingly vital role in international affairs and global economic development.",
+    "isLearned": false,
+    "isFavorite": true,
+    "id": "1-2"
+  },
+  {
+    "word": "Spanish",
+    "pronunciation": "/ˈspænɪʃ/",
+    "definition": "西班牙语；西班牙的；西班牙人",
+    "partOfSpeech": "adj. / n.",
+    "example": "Learning Spanish can open many doors, as it is one of the most widely spoken languages in both the Americas and Europe.",
+    "isLearned": false,
+    "isFavorite": true,
+    "id": "1-53"
+  },
+  {
+    "word": "Germany",
+    "pronunciation": "/ˈdʒɜːrməni/",
+    "definition": "德国",
+    "partOfSpeech": "n.",
+    "example": "Germany is widely recognized for its advanced engineering and its significant contributions to classical music and philosophy.",
+    "isLearned": false,
+    "isFavorite": true,
+    "id": "1-6"
+  },
+  {
+    "word": "Greek",
+    "pronunciation": "/ˈɡriːk/",
+    "definition": "希腊语；希腊的；希腊人",
+    "partOfSpeech": "adj. / n.",
+    "example": "The architecture of ancient Greek temples continues to inspire modern designers with its emphasis on symmetry and proportion.",
+    "isLearned": false,
+    "isFavorite": true,
+    "id": "1-8"
+  },
+  {
+    "word": "Mexican",
+    "pronunciation": "/ˈmeksɪkən/",
+    "definition": "墨西哥的；墨西哥人",
+    "partOfSpeech": "adj. / n.",
+    "example": "Mexican cuisine is famous worldwide for its vibrant flavors and the use of diverse spices that create a unique dining experience.",
+    "isLearned": false,
+    "isFavorite": true,
+    "id": "1-9"
+  },
+  {
+    "word": "million",
+    "pronunciation": "/ˈmɪljən/",
+    "definition": "百万",
+    "partOfSpeech": "num. / n.",
+    "example": "The popular video went viral overnight, garnering over a million views from people all around the globe.",
+    "isLearned": false,
+    "isFavorite": true,
+    "id": "2-29"
+  },
+  {
+    "word": "thousand",
+    "pronunciation": "/ˈθaʊznd/",
+    "definition": "千",
+    "partOfSpeech": "num. / n.",
+    "example": "Thousands of migratory birds stop at this wetland every spring during their long journey to the north.",
+    "isLearned": false,
+    "isFavorite": true,
+    "id": "2-46"
+  },
+  {
+    "word": "beef",
+    "pronunciation": "/biːf/",
+    "definition": "牛肉",
+    "partOfSpeech": "n.",
+    "example": "The high-quality beef used in this steakhouse is imported from Australia and is known for its tenderness.",
+    "isLearned": false,
+    "isFavorite": true,
+    "id": "28-0"
+  },
+  {
+    "word": "burger",
+    "pronunciation": "/ˈbɜːrɡər/",
+    "definition": "汉堡",
+    "partOfSpeech": "n.",
+    "example": "He ordered a double cheese burger with extra pickles and a side of crispy onion rings for lunch.",
+    "isLearned": false,
+    "isFavorite": true,
+    "id": "28-2"
+  },
+  {
+    "word": "cheese",
+    "pronunciation": "/tʃiːz/",
+    "definition": "奶酪",
+    "partOfSpeech": "n.",
+    "example": "France is famous for producing hundreds of varieties of cheese, each with its own unique flavor and texture.",
+    "isLearned": false,
+    "isFavorite": true,
+    "id": "28-3"
+  },
+  {
+    "word": "chicken",
+    "pronunciation": "/ˈtʃɪkɪn/",
+    "definition": "鸡肉；鸡",
+    "partOfSpeech": "n.",
+    "example": "Roasted chicken seasoned with fresh herbs and lemon is a classic dish served during Sunday family dinners.",
+    "isLearned": false,
+    "isFavorite": true,
+    "id": "28-4"
+  },
+  {
+    "word": "test",
+    "id": "test-1",
+    "isFavorite": true
+  }
+]
