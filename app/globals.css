@@ -56,6 +56,25 @@
       -12px -12px 20px rgba(255, 255, 255, 0.9);
   }
 
+  .clay-btn-secondary {
+    @apply relative px-6 py-3 rounded-2xl font-semibold text-gray-700
+      transition-all duration-300 ease-out
+      active:scale-95 active:translate-y-0;
+    background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+    box-shadow:
+      8px 8px 16px rgba(148, 163, 184, 0.3),
+      -8px -8px 16px rgba(255, 255, 255, 0.8),
+      inset 4px 4px 8px rgba(255, 255, 255, 0.4);
+  }
+
+  .clay-btn-secondary:hover {
+    @apply -translate-y-1;
+    background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
+    box-shadow:
+      12px 12px 20px rgba(148, 163, 184, 0.4),
+      -12px -12px 20px rgba(255, 255, 255, 0.9);
+  }
+
   /* Claymorphism Card */
   .clay-card {
     @apply bg-white rounded-3xl p-6 transition-all duration-300 ease-out;

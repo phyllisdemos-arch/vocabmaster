@@ -1,37 +1,68 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Volume2, CheckCircle, XCircle, Home, RotateCcw } from "lucide-react";
+import { Volume2, CheckCircle, XCircle, Home, RotateCcw, BookOpen } from "lucide-react";
 import ClayCard from "@/components/ClayCard";
+import { getLearnedWords, saveTestResult, TestResult, getLearnedWordsCount } from "@/lib/testResults";
 
 interface Word {
   id: number;
   word: string;
+  pronunciation: string;
   definition: string;
 }
 
-const wordsData: Word[] = [
-  { id: 1, word: "ephemeral", definition: "短暂的" },
-  { id: 2, word: "serendipity", definition: "意外发现珍奇事物的运气" },
-  { id: 3, word: "eloquent", definition: "雄辩的" },
-  { id: 4, word: "ubiquitous", definition: "无处不在的" },
-  { id: 5, word: "pragmatic", definition: "务实的" },
-];
-
 export default function ListeningTestPage() {
   const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [wordsData, setWordsData] = useState<Word[]>([]);
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [userInput, setUserInput] = useState("");
   const [hasPlayed, setHasPlayed] = useState(false);
   const [results, setResults] = useState<{ word: string; correct: boolean; userAnswer: string }[]>([]);
   const [showResult, setShowResult] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [startTime, setStartTime] = useState<number>(Date.now());
+  const [learnedWordsCount, setLearnedWordsCount] = useState<number>(0);
+
+  useEffect(() => {
+    loadWords();
+  }, []);
+
+  // Auto-focus input when word changes
+  useEffect(() => {
+    if (!isLoading && !isFinished && wordsData.length > 0 && hasPlayed && !showResult) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+    }
+  }, [isLoading, currentWordIndex, hasPlayed, showResult, isFinished, wordsData.length]);
+
+  const loadWords = async () => {
+    try {
+      // Get count of learned words first
+      const count = await getLearnedWordsCount();
+      setLearnedWordsCount(count);
+
+      // Load learned words for testing
+      const testWords = await getLearnedWords(5);
+
+      setWordsData(testWords);
+      setStartTime(Date.now());
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Failed to load words:', error);
+      setIsLoading(false);
+    }
+  };
 
   const currentWord = wordsData[currentWordIndex];
-  const progress = ((currentWordIndex + 1) / wordsData.length) * 100;
+  const progress = wordsData.length > 0 ? ((currentWordIndex + 1) / wordsData.length) * 100 : 0;
 
   const handleSpeak = () => {
+    if (!currentWord) return;
     const utterance = new SpeechSynthesisUtterance(currentWord.word);
     utterance.lang = "en-US";
     utterance.rate = 0.9;
@@ -40,6 +71,8 @@ export default function ListeningTestPage() {
   };
 
   const handleSubmit = () => {
+    if (!currentWord) return;
+
     const isCorrect = userInput.toLowerCase().trim() === currentWord.word.toLowerCase();
 
     setResults([
@@ -61,9 +94,34 @@ export default function ListeningTestPage() {
       if (currentWordIndex < wordsData.length - 1) {
         setCurrentWordIndex(currentWordIndex + 1);
       } else {
-        setIsFinished(true);
+        finishTest();
       }
     }, 2500);
+  };
+
+  const finishTest = () => {
+    setIsFinished(true);
+
+    // Save test result
+    const duration = Math.round((Date.now() - startTime) / 1000);
+    const correctCount = results.filter(r => r.correct).length;
+    const wordResults = results.map(r => ({
+      wordId: wordsData.find(w => w.word === r.word)?.id || 0,
+      word: r.word,
+      correct: r.correct,
+    }));
+
+    const result: TestResult = {
+      testType: 'listening',
+      date: new Date().toISOString(),
+      totalQuestions: wordsData.length,
+      correctAnswers: correctCount,
+      accuracy: Math.round((correctCount / wordsData.length) * 100),
+      duration,
+      wordResults,
+    };
+
+    saveTestResult(result);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -79,7 +137,47 @@ export default function ListeningTestPage() {
     setResults([]);
     setShowResult(false);
     setIsFinished(false);
+    setIsLoading(true);
+    loadWords();
   };
+
+  if (isLoading) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-20">
+        <div className="text-4xl mb-4">🎧</div>
+        <h2 className="text-2xl font-bold font-display text-primary mb-4">
+          加载中...
+        </h2>
+        <p className="text-gray-600">正在准备测试题目</p>
+      </div>
+    );
+  }
+
+  if (wordsData.length === 0) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-20">
+        <div className="text-6xl mb-4">📚</div>
+        <h2 className="text-2xl font-bold font-display text-primary mb-4">
+          还没有学习记录
+        </h2>
+        <p className="text-gray-600 mb-6">
+          你需要先在复习页面学习一些单词，才能开始测试
+        </p>
+        <div className="bg-blue-50 rounded-xl p-4 mb-6">
+          <div className="flex items-center justify-center gap-2 text-sm text-gray-700">
+            <BookOpen size={18} />
+            <span>已学习单词: {learnedWordsCount} 个</span>
+          </div>
+        </div>
+        <button
+          onClick={() => router.push("/review")}
+          className="clay-btn"
+        >
+          去学习单词
+        </button>
+      </div>
+    );
+  }
 
   if (isFinished) {
     const correctCount = results.filter((r) => r.correct).length;
@@ -104,22 +202,28 @@ export default function ListeningTestPage() {
 
             <div className="bg-blue-50 rounded-2xl p-6 mb-6 text-left">
               <h3 className="font-bold text-lg mb-4">答题详情</h3>
-              {results.map((result, index) => (
-                <div key={index} className="flex items-center justify-between py-3 border-b last:border-0">
-                  <div>
-                    <p className="font-medium">{result.word}</p>
-                    <p className="text-sm text-gray-500">你的答案: {result.userAnswer}</p>
+              <div className="max-h-64 overflow-y-auto">
+                {results.map((result, index) => (
+                  <div key={index} className="flex items-center justify-between py-3 border-b last:border-0">
+                    <div>
+                      <p className="font-medium">{result.word}</p>
+                      <p className="text-sm text-gray-500">你的答案: {result.userAnswer}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {result.correct ? (
+                        <CheckCircle className="text-green-500" size={24} />
+                      ) : (
+                        <XCircle className="text-red-500" size={24} />
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {result.correct ? (
-                      <CheckCircle className="text-green-500" size={24} />
-                    ) : (
-                      <XCircle className="text-red-500" size={24} />
-                    )}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
+
+            <p className="text-sm text-gray-500 mb-6">
+              ✓ 测试结果已保存到复习系统
+            </p>
 
             <div className="flex gap-4 justify-center">
               <button
@@ -160,9 +264,17 @@ export default function ListeningTestPage() {
       </div>
 
       {/* Progress */}
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="progress-bar">
           <div className="progress-fill" style={{ width: `${progress}%` }} />
+        </div>
+      </div>
+
+      {/* Learned Words Info */}
+      <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl">
+        <div className="flex items-center justify-center gap-2 text-sm text-gray-700">
+          <BookOpen size={18} className="text-primary" />
+          <span>从 <span className="font-bold">{learnedWordsCount}</span> 个已学习单词中随机选择</span>
         </div>
       </div>
 
@@ -194,6 +306,7 @@ export default function ListeningTestPage() {
             {/* Input */}
             <div className="mb-6">
               <input
+                ref={inputRef}
                 type="text"
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
@@ -201,7 +314,6 @@ export default function ListeningTestPage() {
                 disabled={showResult}
                 placeholder="输入听到的单词..."
                 className="clay-input text-center text-2xl"
-                autoFocus
               />
             </div>
 

@@ -1,0 +1,163 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Flashcard from "@/components/Flashcard";
+import ProgressBar from "@/components/ProgressBar";
+import { RotateCcw, Home } from "lucide-react";
+
+// Sample words data
+const sampleWords = [
+  {
+    "id": 1,
+    "word": "American",
+    "pronunciation": "/əˈmerɪkən/",
+    "definition": "美国的；美国�?,
+    "partOfSpeech": "adj. / n.",
+    "example": "While American culture has a global influence, it is important to appreciate the diversity within the United States itself.",
+    "isFavorite": false
+  },
+  {
+    "id": 2,
+    "word": "British",
+    "pronunciation": "/ˈbrɪtɪʃ/",
+    "definition": "英国的；英国人的",
+    "partOfSpeech": "adj. / n.",
+    "example": "Many students find it challenging to distinguish between various British accents, which vary significantly from region to region.",
+    "isFavorite": false
+  },
+  {
+    "id": 3,
+    "word": "China",
+    "pronunciation": "/ˈtʃaɪnə/",
+    "definition": "中国",
+    "partOfSpeech": "n.",
+    "example": "As a country with a long history, China is playing an increasingly vital role in international affairs and global economic development.",
+    "isFavorite": false
+  },
+  {
+    "id": 4,
+    "word": "Chinese",
+    "pronunciation": "/ˌtʃaɪˈniːz/",
+    "definition": "中文；中国的；中国人",
+    "partOfSpeech": "adj. / n.",
+    "example": "Not only is the Chinese language rich in cultural heritage, but its complex character system also offers a unique perspective on history.",
+    "isFavorite": false
+  },
+  {
+    "id": 5,
+    "word": "countries",
+    "pronunciation": "/ˈkʌntriz/",
+    "definition": "国家",
+    "partOfSpeech": "n. (pl.)",
+    "example": "With the rapid advancement of globalization, cooperation among different countries has become more essential than ever before.",
+    "isFavorite": false
+  }
+];
+
+export default function LearnPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [words, setWords] = useState(sampleWords);
+  const [known, setKnown] = useState<number[]>([]);
+  const [unknown, setUnknown] = useState<number[]>([]);
+
+  // Check if learning from favorites
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const source = searchParams.get('source');
+      if (source === 'favorites') {
+        const storedWords = localStorage.getItem('vocabmaster-learn-words');
+        if (storedWords) {
+          const parsedWords = JSON.parse(storedWords);
+          setWords(parsedWords);
+          // Clear localStorage after loading
+          localStorage.removeItem('vocabmaster-learn-words');
+        }
+      }
+    }
+  }, [searchParams]);
+
+  const currentWord = words[currentIndex];
+  const isLastCard = currentIndex === words.length - 1;
+
+  const handleNext = (isKnown: boolean) => {
+    if (isKnown) {
+      setKnown([...known, currentWord.id]);
+    } else {
+      setUnknown([...unknown, currentWord.id]);
+    }
+
+    if (isLastCard) {
+      // Navigate to results
+      router.push("/learn/results");
+    } else {
+      setCurrentIndex(currentIndex + 1);
+    }
+  };
+
+  const handleReset = () => {
+    setCurrentIndex(0);
+    setKnown([]);
+    setUnknown([]);
+  };
+
+  const handleToggleFavorite = (wordId: number) => {
+    setWords(words.map(w =>
+      w.id === wordId ? { ...w, isFavorite: !w.isFavorite } : w
+    ));
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <button
+          onClick={() => router.push("/")}
+          className="flex items-center gap-2 text-gray-600 hover:text-primary transition-colors"
+        >
+          <Home size={20} />
+          返回首页
+        </button>
+        <button
+          onClick={handleReset}
+          className="flex items-center gap-2 text-gray-600 hover:text-primary transition-colors"
+        >
+          <RotateCcw size={20} />
+          重新开�?
+        </button>
+      </div>
+
+      {/* Progress */}
+      <div className="mb-8">
+        <ProgressBar current={currentIndex + 1} total={words.length} />
+      </div>
+
+      {/* Flashcard */}
+      <div className="mb-8">
+        <Flashcard
+          word={currentWord}
+          onNext={handleNext}
+          onToggleFavorite={handleToggleFavorite}
+        />
+      </div>
+
+      {/* Stats */}
+      <div className="flex justify-center gap-8">
+        <div className="text-center">
+          <div className="text-2xl font-bold text-green-600">{known.length}</div>
+          <div className="text-sm text-gray-500">已认�?/div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-orange-600">{unknown.length}</div>
+          <div className="text-sm text-gray-500">需复习</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-primary">{words.length - currentIndex}</div>
+          <div className="text-sm text-gray-500">剩余</div>
+        </div>
+      </div>
+    </div>
+  );
+}

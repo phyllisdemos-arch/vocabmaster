@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(npm test:*)",
+      "Bash(npx jest:*)",
+      "Bash(./node_modules/.bin/jest:*)",
+      "Bash(npm run test:*)",
+      "Bash(echo:*)",
+      "Bash(node:*)",
+      "Bash(npm install:*)",
+      "Bash(cmd:*)",
+      "Bash(npm --version:*)",
+      "Bash(ls:*)",
+      "Bash(npm run dev)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(netstat:*)"
+    ]
+  }
+}

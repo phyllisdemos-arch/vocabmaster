@@ -4,62 +4,89 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Flashcard from "@/components/Flashcard";
 import ProgressBar from "@/components/ProgressBar";
-import { RotateCcw, Home } from "lucide-react";
+import { RotateCcw, Home, Calendar, TrendingUp, CheckCircle2, Clock } from "lucide-react";
+import {
+  WordWithReviewState,
+  ReviewState,
+  getWordsDueForReview,
+  calculateNextReviewState,
+  getReviewStageLabel,
+  getDaysUntilNextReview,
+  calculateMasteryPercentage,
+  getReviewStatistics,
+  EBBINGHAUS_INTERVALS,
+} from "@/lib/reviewScheduler";
 
-interface ReviewWord {
-  id: number;
-  word: string;
-  pronunciation: string;
-  definition: string;
-  partOfSpeech: string;
-  example: string;
-  dueAt: string;
-  isFavorite?: boolean;
+interface ReviewWord extends WordWithReviewState {
+  dueAt?: string;
 }
-
-const reviewWords: ReviewWord[] = [
-  {
-    id: 1,
-    word: "ephemeral",
-    pronunciation: "/əˈfemərəl/",
-    definition: "短暂的，转瞬即逝的",
-    partOfSpeech: "adj.",
-    example: "Fashion is ephemeral, changing with every season.",
-    dueAt: "now",
-  },
-  {
-    id: 2,
-    word: "serendipity",
-    pronunciation: "/ˌserənˈdɪpəti/",
-    definition: "意外发现珍奇事物的运气",
-    partOfSpeech: "n.",
-    example: "Meeting my best friend was pure serendipity.",
-    dueAt: "now",
-  },
-  {
-    id: 3,
-    word: "eloquent",
-    pronunciation: "/ˈeləkwənt/",
-    definition: "雄辩的，有说服力的",
-    partOfSpeech: "adj.",
-    example: "She gave an eloquent speech that moved everyone.",
-    dueAt: "now",
-  },
-];
-
-const SM2_INTERVALS = [1, 10, 30, 60, 120, 240]; // minutes
 
 export default function ReviewPage() {
   const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [words, setWords] = useState<ReviewWord[]>(reviewWords);
+  const [allWords, setAllWords] = useState<WordWithReviewState[]>([]);
+  const [reviewWords, setReviewWords] = useState<ReviewWord[]>([]);
   const [known, setKnown] = useState<number[]>([]);
   const [unknown, setUnknown] = useState<number[]>([]);
   const [startTime, setStartTime] = useState<number>(Date.now());
+  const [isLoading, setIsLoading] = useState(true);
+  const [showStatistics, setShowStatistics] = useState(false);
 
-  const currentWord = words[currentIndex];
-  const isLastCard = currentIndex === words.length - 1;
-  const isCompleted = currentIndex >= words.length;
+  // Load words and review states on mount
+  useEffect(() => {
+    loadWordsAndReviewStates();
+  }, []);
+
+  const loadWordsAndReviewStates = async () => {
+    try {
+      // Load all words
+      const wordsResponse = await fetch('/words.json');
+      const allWordsData: WordWithReviewState[] = await wordsResponse.json();
+
+      // Load review states from localStorage
+      const reviewStatesJson = localStorage.getItem('vocabmaster-review-states');
+      const reviewStates: Record<number, ReviewState> = reviewStatesJson
+        ? JSON.parse(reviewStatesJson)
+        : {};
+
+      // Attach review states to words
+      const wordsWithStates = allWordsData.map(word => ({
+        ...word,
+        reviewState: reviewStates[word.id],
+      }));
+
+      setAllWords(wordsWithStates);
+
+      // Get words due for review
+      const dueWords = getWordsDueForReview(wordsWithStates);
+      setReviewWords(dueWords.length > 0 ? dueWords : wordsWithStates.slice(0, 10));
+    } catch (error) {
+      console.error('Failed to load words:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveReviewState = (wordId: number, reviewState: ReviewState) => {
+    try {
+      const reviewStatesJson = localStorage.getItem('vocabmaster-review-states');
+      const reviewStates: Record<number, ReviewState> = reviewStatesJson
+        ? JSON.parse(reviewStatesJson)
+        : {};
+
+      reviewStates[wordId] = reviewState;
+      localStorage.setItem('vocabmaster-review-states', JSON.stringify(reviewStates));
+    } catch (error) {
+      console.error('Failed to save review state:', error);
+    }
+  };
+
+  const currentWord = reviewWords[currentIndex];
+  const isLastCard = currentIndex === reviewWords.length - 1;
+  const isCompleted = currentIndex >= reviewWords.length;
+
+  // Calculate statistics
+  const statistics = getReviewStatistics(allWords);
 
   // Save study session on unmount
   useEffect(() => {
@@ -111,7 +138,7 @@ export default function ReviewPage() {
         case 'd':
         case 'D':
           // Don't allow next if on last card
-          if (currentIndex !== words.length - 1) {
+          if (currentIndex !== reviewWords.length - 1) {
             e.preventDefault();
             handleNext(true);
           }
@@ -124,14 +151,14 @@ export default function ReviewPage() {
         case 'f':
         case 'F':
           e.preventDefault();
-          handleToggleFavorite(words[currentIndex]?.id);
+          handleToggleFavorite(reviewWords[currentIndex]?.id);
           break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentIndex, words]);
+  }, [currentIndex, reviewWords]);
 
   const speak = () => {
     if (currentWord) {
@@ -142,6 +169,28 @@ export default function ReviewPage() {
   };
 
   const handleNext = (isKnown: boolean) => {
+    if (!currentWord) return;
+
+    // Calculate next review state based on performance
+    const nextReviewState = calculateNextReviewState(currentWord.reviewState, isKnown);
+    saveReviewState(currentWord.id, nextReviewState);
+
+    // Update local state
+    setAllWords(prevWords =>
+      prevWords.map(word =>
+        word.id === currentWord.id
+          ? { ...word, reviewState: nextReviewState }
+          : word
+      )
+    );
+    setReviewWords(prevWords =>
+      prevWords.map(word =>
+        word.id === currentWord.id
+          ? { ...word, reviewState: nextReviewState }
+          : word
+      )
+    );
+
     if (isKnown) {
       setKnown([...known, currentWord.id]);
     } else {
@@ -149,8 +198,8 @@ export default function ReviewPage() {
     }
 
     if (isLastCard) {
-      // Navigate to results
-      router.push("/review/results");
+      // Show statistics instead of navigating away
+      setShowStatistics(true);
     } else {
       setCurrentIndex(currentIndex + 1);
     }
@@ -171,7 +220,7 @@ export default function ReviewPage() {
   const handleToggleFavorite = async (wordId: number) => {
     if (!wordId) return;
 
-    const word = words.find((w: ReviewWord) => w.id === wordId);
+    const word = reviewWords.find((w: ReviewWord) => w.id === wordId);
     if (!word) return;
 
     const newFavoriteStatus = !word.isFavorite;
@@ -190,7 +239,7 @@ export default function ReviewPage() {
       }
 
       // Update local state
-      setWords(words.map((w: ReviewWord) =>
+      setReviewWords(reviewWords.map((w: ReviewWord) =>
         w.id === wordId ? { ...w, isFavorite: newFavoriteStatus } : w
       ));
     } catch (error) {
@@ -198,30 +247,145 @@ export default function ReviewPage() {
     }
   };
 
-  if (isCompleted) {
+  if (isLoading) {
     return (
-      <div className="max-w-lg mx-auto text-center">
+      <div className="max-w-lg mx-auto text-center py-20">
+        <div className="text-4xl mb-4">📚</div>
+        <h2 className="text-2xl font-bold font-display text-primary mb-4">
+          加载中...
+        </h2>
+        <p className="text-gray-600">正在准备复习内容</p>
+      </div>
+    );
+  }
+
+  if (showStatistics) {
+    return (
+      <div className="max-w-4xl mx-auto">
         <div className="clay-card">
-          <div className="text-6xl mb-4">🎉</div>
-          <h2 className="text-3xl font-bold font-display text-primary mb-4">
-            复习完成！
-          </h2>
-          <p className="text-gray-600 mb-6">
-            今天已完成 {known.length + unknown.length} 个单词的复习
-          </p>
-          <div className="flex justify-center gap-8 mb-6">
+          <div className="text-center mb-8">
+            <div className="text-6xl mb-4">🎉</div>
+            <h2 className="text-3xl font-bold font-display text-primary mb-4">
+              复习完成！
+            </h2>
+            <p className="text-gray-600">
+              今天已完成 {known.length + unknown.length} 个单词的复习
+            </p>
+          </div>
+
+          {/* Session Results */}
+          <div className="flex justify-center gap-8 mb-8">
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">{known.length}</div>
-              <div className="text-sm text-gray-500">已认识</div>
+              <div className="text-sm text-gray-500">已掌握</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">{unknown.length}</div>
-              <div className="text-sm text-gray-500">需复习</div>
+              <div className="text-sm text-gray-500">需加强</div>
             </div>
           </div>
-          <button className="clay-btn" onClick={() => window.location.reload()}>
-            继续学习
-          </button>
+
+          {/* Overall Statistics */}
+          <div className="border-t pt-8">
+            <h3 className="text-xl font-bold text-primary mb-6 flex items-center gap-2">
+              <TrendingUp size={24} />
+              学习统计
+            </h3>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">{statistics.total}</div>
+                <div className="text-sm text-gray-600">总词汇</div>
+              </div>
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">{statistics.mastered}</div>
+                <div className="text-sm text-gray-600">已掌握</div>
+              </div>
+              <div className="text-center p-4 bg-orange-50 rounded-lg">
+                <div className="text-2xl font-bold text-orange-600">{statistics.inProgress}</div>
+                <div className="text-sm text-gray-600">学习中</div>
+              </div>
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <div className="text-2xl font-bold text-purple-600">{statistics.dueToday}</div>
+                <div className="text-sm text-gray-600">今日待复习</div>
+              </div>
+            </div>
+
+            {/* Ebbinghaus Curve */}
+            <div className="mb-8">
+              <h4 className="text-lg font-bold text-gray-700 mb-4 flex items-center gap-2">
+                <Calendar size={20} />
+                艾宾浩斯遗忘曲线
+              </h4>
+              <div className="grid grid-cols-4 gap-2 text-sm">
+                {EBBINGHAUS_INTERVALS.map((interval, index) => (
+                  <div
+                    key={index}
+                    className="text-center p-3 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg"
+                  >
+                    <div className="font-bold text-primary">
+                      {interval === 1 ? "1天" :
+                       interval === 30 ? "1个月" :
+                       interval === 90 ? "3个月" :
+                       interval === 180 ? "6个月" :
+                       `${interval}天`}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      第{index + 1}次复习
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Upcoming Reviews */}
+            {Object.keys(statistics.upcoming).length > 0 && (
+              <div className="mb-8">
+                <h4 className="text-lg font-bold text-gray-700 mb-4 flex items-center gap-2">
+                  <Clock size={20} />
+                  即将到来的复习
+                </h4>
+                <div className="space-y-2">
+                  {Object.entries(statistics.upcoming)
+                    .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                    .slice(0, 7)
+                    .map(([days, count]) => (
+                      <div
+                        key={days}
+                        className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
+                      >
+                        <span className="text-gray-700">
+                          {days === "1" ? "明天" : `${days}天后`}
+                        </span>
+                        <span className="font-bold text-primary">{count} 个单词</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-center gap-4 mt-8">
+            <button
+              className="clay-btn"
+              onClick={() => {
+                setShowStatistics(false);
+                setCurrentIndex(0);
+                setKnown([]);
+                setUnknown([]);
+                loadWordsAndReviewStates();
+              }}
+            >
+              继续复习
+            </button>
+            <button
+              className="clay-btn-secondary"
+              onClick={() => router.push("/")}
+            >
+              返回首页
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -247,17 +411,54 @@ export default function ReviewPage() {
         </button>
       </div>
 
-      {/* Progress */}
-      <div className="mb-8">
-        <ProgressBar current={currentIndex + 1} total={words.length} />
+      {/* Statistics Summary */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="text-center p-3 bg-blue-50 rounded-lg">
+          <div className="text-lg font-bold text-blue-600">{statistics.dueToday}</div>
+          <div className="text-xs text-gray-600">今日待复习</div>
+        </div>
+        <div className="text-center p-3 bg-green-50 rounded-lg">
+          <div className="text-lg font-bold text-green-600">{statistics.mastered}</div>
+          <div className="text-xs text-gray-600">已掌握</div>
+        </div>
+        <div className="text-center p-3 bg-orange-50 rounded-lg">
+          <div className="text-lg font-bold text-orange-600">{statistics.inProgress}</div>
+          <div className="text-xs text-gray-600">学习中</div>
+        </div>
       </div>
 
+      {/* Progress */}
+      <div className="mb-6">
+        <ProgressBar current={currentIndex + 1} total={reviewWords.length} />
+      </div>
+
+      {/* Current Word Review Stage */}
+      {currentWord && currentWord.reviewState && (
+        <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={20} className="text-primary" />
+              <span className="text-sm font-medium text-gray-700">
+                {getReviewStageLabel(currentWord.reviewState.currentStage)}
+              </span>
+            </div>
+            <div className="text-sm text-gray-600">
+              掌握度: {calculateMasteryPercentage(currentWord.reviewState)}%
+            </div>
+          </div>
+          <div className="mt-2 text-xs text-gray-500">
+            已复习 {currentWord.reviewState.reviewCount} 次 |
+            正确率: {currentWord.reviewState.reviewCount > 0 ? Math.round((currentWord.reviewState.correctCount / currentWord.reviewState.reviewCount) * 100) : 0}%
+          </div>
+        </div>
+      )}
+
       {/* Flashcard */}
-      <div className="mb-8">
+      <div className="mb-6">
         <Flashcard
           word={currentWord}
           currentIndex={currentIndex}
-          totalWords={words.length}
+          totalWords={reviewWords.length}
           isLastWord={isLastCard}
           onNext={handleNext}
           onPrevious={handlePrevious}
@@ -269,14 +470,14 @@ export default function ReviewPage() {
       <div className="flex justify-center gap-8">
         <div className="text-center">
           <div className="text-2xl font-bold text-green-600">{known.length}</div>
-          <div className="text-sm text-gray-500">已认识</div>
+          <div className="text-sm text-gray-500">已掌握</div>
         </div>
         <div className="text-center">
           <div className="text-2xl font-bold text-orange-600">{unknown.length}</div>
-          <div className="text-sm text-gray-500">需复习</div>
+          <div className="text-sm text-gray-500">需加强</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-bold text-primary">{words.length - currentIndex}</div>
+          <div className="text-2xl font-bold text-primary">{reviewWords.length - currentIndex}</div>
           <div className="text-sm text-gray-500">剩余</div>
         </div>
       </div>

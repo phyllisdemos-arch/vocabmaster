@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, XCircle, Home, RotateCcw } from "lucide-react";
+import { CheckCircle, XCircle, Home, RotateCcw, BookOpen } from "lucide-react";
 import ClayCard from "@/components/ClayCard";
+import { getLearnedWords, getWrongAnswers, saveTestResult, TestResult, getLearnedWordsCount } from "@/lib/testResults";
 
 interface Question {
   id: number;
+  wordId: number;
   word: string;
   pronunciation: string;
   correctAnswer: string;
@@ -15,64 +17,58 @@ interface Question {
   selectedAnswer: string | null;
 }
 
-const questionsData: Question[] = [
-  {
-    id: 1,
-    word: "ephemeral",
-    pronunciation: "/əˈfemərəl/",
-    correctAnswer: "短暂的",
-    options: ["短暂的", "永恒的", "美丽的", "神秘的"],
-    isAnswered: false,
-    selectedAnswer: null,
-  },
-  {
-    id: 2,
-    word: "serendipity",
-    pronunciation: "/ˌserənˈdɪpəti/",
-    correctAnswer: "意外发现珍奇事物的运气",
-    options: ["悲伤", "意外发现珍奇事物的运气", "愤怒", "快乐"],
-    isAnswered: false,
-    selectedAnswer: null,
-  },
-  {
-    id: 3,
-    word: "eloquent",
-    pronunciation: "/ˈeləkwənt/",
-    correctAnswer: "雄辩的",
-    options: ["沉默的", "雄辩的", "害羞的", "傲慢的"],
-    isAnswered: false,
-    selectedAnswer: null,
-  },
-  {
-    id: 4,
-    word: "ubiquitous",
-    pronunciation: "/juːˈbɪkwɪtəs/",
-    correctAnswer: "无处不在的",
-    options: ["稀有的", "遥远的", "无处不在的", "古老的"],
-    isAnswered: false,
-    selectedAnswer: null,
-  },
-  {
-    id: 5,
-    word: "pragmatic",
-    pronunciation: "/præɡˈmætɪk/",
-    correctAnswer: "务实的",
-    options: ["理想主义的", "务实的", "浪漫的", "保守的"],
-    isAnswered: false,
-    selectedAnswer: null,
-  },
-];
-
 export default function MultipleChoiceTestPage() {
   const router = useRouter();
-  const [questions, setQuestions] = useState<Question[]>(questionsData);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const [score, setScore] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [startTime, setStartTime] = useState<number>(Date.now());
+  const [learnedWordsCount, setLearnedWordsCount] = useState<number>(0);
+
+  useEffect(() => {
+    loadQuestions();
+  }, []);
+
+  const loadQuestions = async () => {
+    try {
+      // Get count of learned words first
+      const count = await getLearnedWordsCount();
+      setLearnedWordsCount(count);
+
+      // Load learned words for testing
+      const testWords = await getLearnedWords(10);
+      const allWords = await fetch('/words.json').then(res => res.json());
+
+      const questionsData: Question[] = testWords.map((word, index) => {
+        const wrongAnswers = getWrongAnswers(word.definition, 3, allWords);
+        const options = [word.definition, ...wrongAnswers].sort(() => Math.random() - 0.5);
+
+        return {
+          id: index + 1,
+          wordId: word.id,
+          word: word.word,
+          pronunciation: word.pronunciation,
+          correctAnswer: word.definition,
+          options,
+          isAnswered: false,
+          selectedAnswer: null,
+        };
+      });
+
+      setQuestions(questionsData);
+      setStartTime(Date.now());
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Failed to load questions:', error);
+      setIsLoading(false);
+    }
+  };
 
   const currentQuestion = questions[currentQuestionIndex];
-  const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+  const progress = questions.length > 0 ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0;
 
   const handleAnswer = (answer: string) => {
     const updatedQuestions = [...questions];
@@ -88,25 +84,53 @@ export default function MultipleChoiceTestPage() {
       setScore(score + 1);
     }
 
+    setShowResult(true);
+
     // Show result for 1.5 seconds then move to next
     setTimeout(() => {
+      setShowResult(false); // Reset showResult before moving to next
+
       if (currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
       } else {
-        setIsFinished(true);
-        setShowResult(true);
+        finishTest();
       }
     }, 1500);
+  };
 
+  const finishTest = () => {
+    setIsFinished(true);
     setShowResult(true);
+
+    // Save test result
+    const duration = Math.round((Date.now() - startTime) / 1000);
+    const wordResults = questions.map(q => ({
+      wordId: q.wordId,
+      word: q.word,
+      correct: q.selectedAnswer === q.correctAnswer,
+    }));
+
+    const result: TestResult = {
+      testType: 'multiple-choice',
+      date: new Date().toISOString(),
+      totalQuestions: questions.length,
+      correctAnswers: score,
+      accuracy: Math.round((score / questions.length) * 100),
+      duration,
+      wordResults,
+    };
+
+    saveTestResult(result);
   };
 
   const handleRestart = () => {
-    setQuestions(questionsData);
+    setQuestions([]);
     setCurrentQuestionIndex(0);
     setScore(0);
     setShowResult(false);
     setIsFinished(false);
+    setIsLoading(true);
+    loadQuestions();
   };
 
   const speak = (word: string) => {
@@ -114,6 +138,44 @@ export default function MultipleChoiceTestPage() {
     utterance.lang = "en-US";
     speechSynthesis.speak(utterance);
   };
+
+  if (isLoading) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-20">
+        <div className="text-4xl mb-4">📝</div>
+        <h2 className="text-2xl font-bold font-display text-primary mb-4">
+          加载中...
+        </h2>
+        <p className="text-gray-600">正在准备测试题目</p>
+      </div>
+    );
+  }
+
+  if (questions.length === 0) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-20">
+        <div className="text-6xl mb-4">📚</div>
+        <h2 className="text-2xl font-bold font-display text-primary mb-4">
+          还没有学习记录
+        </h2>
+        <p className="text-gray-600 mb-6">
+          你需要先在复习页面学习一些单词，才能开始测试
+        </p>
+        <div className="bg-blue-50 rounded-xl p-4 mb-6">
+          <div className="flex items-center justify-center gap-2 text-sm text-gray-700">
+            <BookOpen size={18} />
+            <span>已学习单词: {learnedWordsCount} 个</span>
+          </div>
+        </div>
+        <button
+          onClick={() => router.push("/review")}
+          className="clay-btn"
+        >
+          去学习单词
+        </button>
+      </div>
+    );
+  }
 
   if (isFinished) {
     const percentage = Math.round((score / questions.length) * 100);
@@ -136,21 +198,27 @@ export default function MultipleChoiceTestPage() {
 
             <div className="bg-blue-50 rounded-2xl p-6 mb-6">
               <h3 className="font-bold text-lg mb-4">答题详情</h3>
-              {questions.map((q, index) => (
-                <div key={q.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <span className="text-sm">
-                    {index + 1}. {q.word}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {q.selectedAnswer === q.correctAnswer ? (
-                      <CheckCircle className="text-green-500" size={20} />
-                    ) : (
-                      <XCircle className="text-red-500" size={20} />
-                    )}
+              <div className="max-h-64 overflow-y-auto">
+                {questions.map((q, index) => (
+                  <div key={q.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                    <span className="text-sm">
+                      {index + 1}. {q.word}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {q.selectedAnswer === q.correctAnswer ? (
+                        <CheckCircle className="text-green-500" size={20} />
+                      ) : (
+                        <XCircle className="text-red-500" size={20} />
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
+
+            <p className="text-sm text-gray-500 mb-6">
+              ✓ 测试结果已保存到复习系统
+            </p>
 
             <div className="flex gap-4 justify-center">
               <button
@@ -191,9 +259,17 @@ export default function MultipleChoiceTestPage() {
       </div>
 
       {/* Progress */}
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="progress-bar">
           <div className="progress-fill" style={{ width: `${progress}%` }} />
+        </div>
+      </div>
+
+      {/* Learned Words Info */}
+      <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl">
+        <div className="flex items-center justify-center gap-2 text-sm text-gray-700">
+          <BookOpen size={18} className="text-primary" />
+          <span>从 <span className="font-bold">{learnedWordsCount}</span> 个已学习单词中随机选择</span>
         </div>
       </div>
 
